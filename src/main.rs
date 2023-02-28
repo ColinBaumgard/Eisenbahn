@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 #![allow(unused)]
 
-use crate::{eisenbahn::*, mouse::*};
+use crate::{eisenbahn::*, graph::*, mouse::*, num::*};
 
 use bevy::prelude::*;
 use bevy_prototype_lyon::prelude::*;
@@ -9,8 +9,10 @@ use bevy_prototype_lyon::prelude::*;
 use std::collections::HashMap;
 
 mod eisenbahn;
+mod graph;
 mod layer;
 mod mouse;
+mod num;
 
 fn main() {
     let mut app = App::new();
