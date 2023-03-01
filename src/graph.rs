@@ -1,5 +1,11 @@
 use bevy::{math, prelude::*, ui::node};
-use petgraph::{algo::astar::astar, data::Build, graph, graphmap::GraphMap, Undirected};
+use petgraph::{
+    algo::astar::astar,
+    data::Build,
+    graph,
+    graphmap::{GraphMap, Nodes},
+    Undirected,
+};
 use std::{
     cmp::Ordering,
     hash::{Hash, Hasher},
@@ -7,13 +13,13 @@ use std::{
 
 #[derive(Resource)]
 pub struct TrackGraph {
-    graph: GraphMap<Node, (), Undirected>,
+    graph: GraphMap<TrackNode, (), Undirected>,
     next_id: u32,
 }
 
 impl TrackGraph {
     pub fn new() -> Self {
-        let mut graph = GraphMap::<Node, (), Undirected>::new();
+        let mut graph = GraphMap::<TrackNode, (), Undirected>::new();
         TrackGraph {
             graph: graph,
             next_id: 0,
@@ -26,12 +32,23 @@ impl TrackGraph {
         id
     }
 
-    pub fn add_unconnected_track(&mut self, pos1: Vec2, pos2: Vec2) -> (Node, Node) {
-        let n1 = Node {
+    pub fn get_all_nodes(&self) -> Nodes<TrackNode> {
+        self.graph.nodes()
+    }
+
+    pub fn contains_node(&self, node: TrackNode) -> bool {
+        self.graph.contains_node(node)
+    }
+    pub fn contains_edge(&self, a: TrackNode, b: TrackNode) -> bool {
+        self.graph.contains_edge(a, b)
+    }
+
+    pub fn add_unconnected_track(&mut self, pos1: Vec2, pos2: Vec2) -> (TrackNode, TrackNode) {
+        let n1 = TrackNode {
             id: self.get_id(),
             position: pos1,
         };
-        let n2 = Node {
+        let n2 = TrackNode {
             id: self.get_id(),
             position: pos2,
         };
@@ -43,16 +60,16 @@ impl TrackGraph {
         (n1, n2)
     }
 
-    pub fn add_track(&mut self, a: Node, b: Node) {
+    pub fn add_track(&mut self, a: TrackNode, b: TrackNode) {
         self.graph.add_edge(a, b, ());
     }
 
-    pub fn extend_track(&mut self, node: Node, pos: Vec2) -> Node {
-        let end = Node {
+    pub fn extend_track(&mut self, node: TrackNode, pos: Vec2) -> TrackNode {
+        let end = TrackNode {
             id: self.get_id(),
             position: pos,
         };
-        let track = Track;
+        let track = TrackEdge;
 
         self.graph.add_node(end);
         self.graph.add_edge(node, end, ());
@@ -60,10 +77,10 @@ impl TrackGraph {
         end
     }
 
-    pub fn split_track(&mut self, a: Node, b: Node, pos: Vec2) -> Node {
+    pub fn split_track(&mut self, a: TrackNode, b: TrackNode, pos: Vec2) -> TrackNode {
         self.graph.remove_edge(a, b);
 
-        let node = Node {
+        let node = TrackNode {
             id: self.get_id(),
             position: pos,
         };
@@ -74,7 +91,7 @@ impl TrackGraph {
         node
     }
 
-    pub fn remove_track(&mut self, a: Node, b: Node) {
+    pub fn remove_track(&mut self, a: TrackNode, b: TrackNode) {
         self.graph.remove_edge(a, b);
         for node in [a, b] {
             if self.graph.edges(node).next().is_none() {
@@ -83,7 +100,7 @@ impl TrackGraph {
         }
     }
 
-    pub fn get_path(&self, from: Node, to: Node) -> Option<(f32, Vec<Node>)> {
+    pub fn get_path(&self, from: TrackNode, to: TrackNode) -> Option<(f32, Vec<TrackNode>)> {
         astar(
             &self.graph,
             from,
@@ -95,29 +112,29 @@ impl TrackGraph {
 }
 
 #[derive(Debug, Component, Clone, Copy, PartialEq)]
-pub struct Node {
+pub struct TrackNode {
     id: u32,
-    position: Vec2,
+    pub position: Vec2,
 }
-impl Hash for Node {
+impl Hash for TrackNode {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_u8(self.id as u8)
     }
 }
-impl Ord for Node {
-    fn cmp(&self, other: &Node) -> Ordering {
+impl Ord for TrackNode {
+    fn cmp(&self, other: &TrackNode) -> Ordering {
         self.id.cmp(&other.id)
     }
 }
-impl Eq for Node {}
-impl PartialOrd for Node {
-    fn partial_cmp(&self, other: &Node) -> Option<Ordering> {
+impl Eq for TrackNode {}
+impl PartialOrd for TrackNode {
+    fn partial_cmp(&self, other: &TrackNode) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 #[derive(Component)]
-pub struct Track;
+pub struct TrackEdge;
 
 #[test]
 fn test_graph() {
