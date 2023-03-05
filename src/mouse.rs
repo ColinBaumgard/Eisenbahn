@@ -8,14 +8,6 @@ pub struct MouseState {
     pub position: Vec2,
     pub window_position: Vec2,
 }
-// impl Default for MouseState {
-//     fn default() -> Self {
-//         MouseState {
-//             position: Vec2 { x: 0.0, y: 0.0 },
-//             window_position: Vec2 { x: 0.0, y: 0.0 },
-//         }
-//     }
-// }
 
 pub struct MousePlugin;
 impl Plugin for MousePlugin {

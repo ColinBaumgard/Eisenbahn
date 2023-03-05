@@ -1,4 +1,7 @@
-use crate::{graph, layer, mouse, num, ColorNames, GameColors, MouseState, ORANGE, PURPLE};
+use crate::{
+    layer, mouse, num, ColorNames, GameColors, MouseState, ORANGE, PURPLE,
+    {TrackEdge, TrackGraph, TrackNode, TrackWeight},
+};
 
 use bevy::{
     math,
@@ -7,111 +10,103 @@ use bevy::{
 };
 
 use bevy_prototype_lyon::{entity::*, prelude::*};
-use petgraph::{graphmap::GraphMap, Undirected};
-
+use petgraph::{
+    graphmap::GraphMap,
+    stable_graph::{EdgeIndex, EdgeIndices, EdgeReference, NodeIndex, NodeIndices, StableGraph},
+    Undirected,
+};
+use std::collections::HashMap;
 pub struct EisenbahnPlugin;
 impl Plugin for EisenbahnPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(initialise_world);
+        // app.add_startup_system(initialise_world);
 
-        let mut tracks = graph::TrackGraph::new();
-        app.insert_resource(tracks);
+        // let mut tracks = TrackGraph::new();
+        // app.insert_resource(tracks);
 
-        app.add_system(update_graph_system);
+        // app.add_system(update_nodes_system);
     }
 }
 
-fn initialise_world(
-    mut commands: Commands,
-    game_colors: Res<GameColors>,
-    mut track_graph: ResMut<graph::TrackGraph>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) {
-    let pos1 = Vec2 { x: 0.0, y: 0.0 };
-    let pos2 = Vec2 { x: 0.0, y: 100.0 };
-    let pos3 = Vec2 { x: 0.0, y: 150.0 };
-    let pos4 = Vec2 { x: 100.0, y: 150.0 };
-
-    let (n1, n2) = track_graph.add_unconnected_track(pos1, pos2);
-    let n3 = track_graph.extend_track(n2, pos3);
-    let n4 = track_graph.extend_track(n3, pos4);
-    //     track_graph.add_track(n2, n4);
-}
-
-#[derive(Component)]
-pub struct Position(Vec2);
-
-fn update_graph_system(
-    mut commands: Commands,
-    mut track_graph: ResMut<graph::TrackGraph>,
-    mut q_nodes: Query<(Entity, &mut graph::TrackNode, &mut Transform)>,
-) {
-    let mut graph_nodes_vec: Vec<graph::TrackNode> = track_graph.get_all_nodes().collect();
-    for (entity, node, mut transform) in q_nodes.iter_mut() {
-        graph_nodes_vec.retain(|vec_node| *vec_node == *node);
-        if !track_graph.contains_node(*node) {
-            commands.entity(entity).despawn();
-        } else {
-            transform.translation.x = node.position.x;
-            transform.translation.y = node.position.y;
-        }
-    }
-    for g_node in graph_nodes_vec {
-        let mut node_sprite = get_node_shape(g_node.position);
-        commands.spawn((g_node, node_sprite));
-    }
-}
-
-// pub fn add_unconnected_track(
-//     mut commands: &Commands,
-//     mut track_graph: &ResMut<graph::TrackGraph>,
-//     pos1: Vec2,
-//     pos2: Vec2,
-// ) {
-//     let (mut a, mut b) = track_graph.add_unconnected_track(pos1, pos2);
-
-//     // add_track(commands, track_graph, a, b);
-
-//     let mut sprite_a = get_node_shape(a.position);
-//     let mut sprite_b = get_node_shape(b.position);
-//     commands.spawn((a, sprite_a));
-//     commands.spawn((b, sprite_b));
-// }
-
-// pub fn add_track(
+// fn initialise_world(
 //     mut commands: Commands,
-//     mut track_graph: ResMut<graph::TrackGraph>,
-//     a: graph::TrackNode,
-//     b: graph::TrackNode,
-// ) {
-//     let mut sprite_track = get_track_shape(a.position, b.position);
-//     commands.spawn((graph::TrackEdge, sprite_track));
-// }
-
-// pub fn extend_track(
-//     mut commands: Commands,
-//     mut track_graph: ResMut<graph::TrackGraph>,
-//     node: Node,
-//     pos: Vec2,
+//     game_colors: Res<GameColors>,
+//     mut track_graph: ResMut<TrackGraph>,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     mut materials: ResMut<Assets<ColorMaterial>>,
 // ) {
 // }
 
-// pub fn split_track(
+// #[derive(Component)]
+// pub struct Position(Vec2);
+
+// fn mouse_system(
 //     mut commands: Commands,
-//     mut track_graph: ResMut<graph::TrackGraph>,
-//     a: Node,
-//     b: Node,
-//     pos: Vec2,
+//     mut track_graph: ResMut<TrackGraph>,
+//     mouse: Res<MouseState>,
+//     buttons: Res<Input<MouseButton>>,
 // ) {
+//     // if buttons.just_pressed(MouseButton::Left) {
+//     //     let node_sprite = get_node_shape(mouse.position);
+//     //     let node_index = track_graph.add_node();
+//     //     commands.spawn((TrackNode { id: node_index }, node_sprite));
+//     // }
 // }
 
-// pub fn remove_track(
+// fn spawn_node(
 //     mut commands: Commands,
-//     mut track_graph: ResMut<graph::TrackGraph>,
-//     a: Node,
-//     b: Node,
+
+// )
+
+// fn update_nodes_system(
+//     mut commands: Commands,
+//     mut track_graph: ResMut<TrackGraph>,
+//     mut q_nodes: Query<(Entity, &mut TrackNode, &mut Transform), Without<TrackEdge>>,
+//     mut q_track: Query<(Entity, &mut TrackEdge, &mut Transform), Without<TrackNode>>,
 // ) {
+//     let mut graph_nodes_vec: Vec<NodeIndex> = track_graph.get_all_nodes().collect();
+
+//     let mut node_entity_map = HashMap::new();
+
+//     // Loop through registered nodes
+//     for (entity, node, mut transform) in q_nodes.iter_mut() {
+//         graph_nodes_vec.retain(|vec_node| *vec_node == node.id);
+//         if !track_graph.contains_node(node.id) {
+//             commands.entity(entity).despawn();
+//         } else {
+//             // node_entity_map.insert(node.id, entity);
+//         }
+//     }
+//     // Loop through unregistered nodes
+//     for g_node in graph_nodes_vec {
+//         let mut node_sprite = get_node_shape(g_node.position);
+//         let entity = commands.spawn((g_node, node_sprite)).id();
+//         node_entity_map.insert(g_node.id, entity);
+//     }
+
+// let mut graph_tracks_vec: Vec<(TrackNode, TrackNode, &())> =
+//     track_graph.get_all_edges().collect();
+// Loop through registered tracks
+// for (entity, edge, mut transform) in q_track.iter_mut() {
+//     graph_tracks_vec.retain(|vec_node| vec_node.0.id == edge.a && vec_node.1.id == edge.b);
+//     if !track_graph.contains_node(*node) {
+//         commands.entity(entity).despawn();
+//     } else {
+//         node_entity_map.insert(node.id, entity);
+//         transform.translation.x = node.position.x;
+//         transform.translation.y = node.position.y;
+//     }
+// }
+// Loop through unregistered tracks
+// for (g_node_a, g_node_b, _) in graph_tracks_vec {
+//     let mut track_sprite = get_track_shape(g_node_a.position, g_node_b.position);
+//     commands.spawn((
+//         TrackEdge {
+//             a: g_node_a.id,
+//             b: g_node_b.id,
+//         },
+//         track_sprite,
+//     ));
 // }
 
 fn get_node_shape(pos: Vec2) -> ShapeBundle {
