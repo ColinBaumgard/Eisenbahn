@@ -37,98 +37,99 @@ pub struct TrackWeight {
 
 #[derive(Resource)]
 pub struct TrackGraph {
-    graph: StableGraph<(), TrackWeight>,
+    graph: StableGraph<(), TrackWeight, Undirected, u32>,
 }
-impl TrackGraph {}
-// pub fn new() -> Self {
-//     let mut graph = StableGraph::<(), TrackWeight>::new();
-//     TrackGraph { graph: graph }
-// }
+impl TrackGraph {
+    pub fn new() -> Self {
+        let mut graph = StableGraph::<(), TrackWeight, Undirected, u32>::with_capacity(0, 0);
+        TrackGraph { graph: graph }
+    }
 
-// pub fn get_all_nodes(&self) -> NodeIndices<()> {
-//     self.graph.node_indices()
-// }
-// pub fn get_all_edges(&self) -> EdgeIndices<TrackWeight> {
-//     self.graph.edge_indices()
-// }
-// pub fn contains_node(&self, node: NodeIndex) -> bool {
-//     self.graph.contains_node(node)
-// }
-// pub fn contains_edge(&self, a: NodeIndex, b: NodeIndex) -> bool {
-//     self.graph.contains_edge(a, b)
-// }
+    pub fn get_all_nodes(&self) -> NodeIndices<()> {
+        self.graph.node_indices()
+    }
+    pub fn get_all_edges(&self) -> EdgeIndices<TrackWeight> {
+        self.graph.edge_indices()
+    }
+    pub fn contains_node(&self, node: NodeIndex) -> bool {
+        self.graph.contains_node(node)
+    }
+    pub fn contains_edge(&self, a: NodeIndex, b: NodeIndex) -> bool {
+        self.graph.contains_edge(a, b)
+    }
 
-// pub fn add_node(&mut self) -> NodeIndex {
-//     self.graph.add_node(())
-// }
+    pub fn add_node(&mut self) -> NodeIndex {
+        self.graph.add_node(())
+    }
 
-// pub fn add_unconnected_track(
-//     &mut self,
-//     track_weight: TrackWeight,
-// ) -> (NodeIndex, NodeIndex, EdgeIndex) {
-//     let a = self.graph.add_node(());
-//     let b = self.graph.add_node(());
-//     (a, b, self.add_track(a, b, track_weight))
-// }
+    pub fn add_unconnected_track(
+        &mut self,
+        track_weight: TrackWeight,
+    ) -> (NodeIndex, NodeIndex, EdgeIndex) {
+        let a = self.graph.add_node(());
+        let b = self.graph.add_node(());
+        (a, b, self.add_track(a, b, track_weight))
+    }
 
-// pub fn add_track(
-//     &mut self,
-//     a: NodeIndex,
-//     b: NodeIndex,
-//     track_weight: TrackWeight,
-// ) -> EdgeIndex {
-//     self.graph.add_edge(a, b, track_weight)
-// }
+    pub fn add_track(
+        &mut self,
+        a: NodeIndex,
+        b: NodeIndex,
+        track_weight: TrackWeight,
+    ) -> EdgeIndex {
+        self.graph.add_edge(a, b, track_weight)
+    }
 
-// pub fn extend_track(
-//     &mut self,
-//     node: NodeIndex,
-//     track_weight: TrackWeight,
-// ) -> (NodeIndex, EdgeIndex) {
-//     let end = self.graph.add_node(());
-//     (end, self.graph.add_edge(node, end, track_weight))
-// }
+    pub fn extend_track(
+        &mut self,
+        node: NodeIndex,
+        track_weight: TrackWeight,
+    ) -> (NodeIndex, EdgeIndex) {
+        let end = self.graph.add_node(());
+        (end, self.graph.add_edge(node, end, track_weight))
+    }
 
-// pub fn split_track(
-//     &mut self,
-//     a: NodeIndex,
-//     b: NodeIndex,
-//     e: EdgeIndex,
-//     weight_left: TrackWeight,
-//     weight_right: TrackWeight,
-// ) -> (NodeIndex, EdgeIndex, EdgeIndex) {
-//     self.graph.remove_edge(e);
+    pub fn split_track(
+        &mut self,
+        a: NodeIndex,
+        b: NodeIndex,
+        e: EdgeIndex,
+        weight_left: TrackWeight,
+        weight_right: TrackWeight,
+    ) -> (NodeIndex, EdgeIndex, EdgeIndex) {
+        self.graph.remove_edge(e);
 
-//     let c = self.graph.add_node(());
-//     let f = self.graph.add_edge(a, c, weight_left);
-//     let g = self.graph.add_edge(b, c, weight_right);
+        let c = self.graph.add_node(());
+        let f = self.graph.add_edge(a, c, weight_left);
+        let g = self.graph.add_edge(b, c, weight_right);
 
-//     (c, f, g)
-// }
+        (c, f, g)
+    }
 
-// pub fn remove_track(&mut self, a: NodeIndex, b: NodeIndex, e: EdgeIndex) {
-//     self.graph.remove_edge(e);
-//     for node in [a, b] {
-//         if self.graph.edges(node).next().is_none() {
-//             self.graph.remove_node(node);
-//         }
-//     }
-// }
+    pub fn remove_track(&mut self, a: NodeIndex, b: NodeIndex, e: EdgeIndex) {
+        self.graph.remove_edge(e);
+        for node in [a, b] {
+            if self.graph.edges(node).next().is_none() {
+                self.graph.remove_node(node);
+            }
+        }
+    }
 
-// pub fn get_path(
-//     &self,
-//     from: NodeIndex,
-//     to: NodeIndex,
-//     velocity: f32,
-// ) -> Option<(f32, Vec<NodeIndex>)> {
-//     astar(
-//         &self.graph,
-//         from,
-//         |finish| finish == to,
-//         |(edge_ref)| edge_ref.weight().length * velocity,
-//         |node| 0.,
-//     )
-// }
+    pub fn get_path(
+        &self,
+        from: NodeIndex,
+        to: NodeIndex,
+        velocity: f32,
+    ) -> Option<(f32, Vec<NodeIndex>)> {
+        astar(
+            &self.graph,
+            from,
+            |finish| finish == to,
+            |(edge_ref)| edge_ref.weight().length * velocity,
+            |node| 0.,
+        )
+    }
+}
 
 // #[test]
 // fn test_graph() {

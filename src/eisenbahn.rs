@@ -21,10 +21,10 @@ impl Plugin for EisenbahnPlugin {
     fn build(&self, app: &mut App) {
         // app.add_startup_system(initialise_world);
 
-        // let mut tracks = TrackGraph::new();
-        // app.insert_resource(tracks);
+        let mut tracks = TrackGraph::new();
+        app.insert_resource(tracks);
 
-        // app.add_system(update_nodes_system);
+        app.add_system(mouse_system);
     }
 }
 
@@ -40,18 +40,16 @@ impl Plugin for EisenbahnPlugin {
 // #[derive(Component)]
 // pub struct Position(Vec2);
 
-// fn mouse_system(
-//     mut commands: Commands,
-//     mut track_graph: ResMut<TrackGraph>,
-//     mouse: Res<MouseState>,
-//     buttons: Res<Input<MouseButton>>,
-// ) {
-//     // if buttons.just_pressed(MouseButton::Left) {
-//     //     let node_sprite = get_node_shape(mouse.position);
-//     //     let node_index = track_graph.add_node();
-//     //     commands.spawn((TrackNode { id: node_index }, node_sprite));
-//     // }
-// }
+fn mouse_system(
+    mut commands: Commands,
+    mut track_graph: ResMut<TrackGraph>,
+    mouse: Res<MouseState>,
+    buttons: Res<Input<MouseButton>>,
+) {
+    if buttons.just_pressed(MouseButton::Left) {
+        commands.spawn(get_node_bundle(mouse.position, track_graph));
+    }
+}
 
 // fn spawn_node(
 //     mut commands: Commands,
@@ -108,6 +106,12 @@ impl Plugin for EisenbahnPlugin {
 //         track_sprite,
 //     ));
 // }
+
+fn get_node_bundle(pos: Vec2, mut track_graph: ResMut<TrackGraph>) -> (TrackNode, ShapeBundle) {
+    let node_sprite = get_node_shape(pos);
+    let node_index = track_graph.add_node();
+    (TrackNode { id: node_index }, node_sprite)
+}
 
 fn get_node_shape(pos: Vec2) -> ShapeBundle {
     GeometryBuilder::build_as(
