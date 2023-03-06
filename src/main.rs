@@ -1,18 +1,19 @@
 #![allow(unused_imports)]
 #![allow(unused)]
 
-use crate::{eisenbahn::*, graph::*, mouse::*, num::*};
+use crate::{eisenbahn::*, graph::*, mouse::*, num::*, tools::*};
 
 use bevy::prelude::*;
 use bevy_prototype_lyon::prelude::*;
 
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 mod eisenbahn;
 mod graph;
 mod layer;
 mod mouse;
 mod num;
+mod tools;
 
 fn main() {
     let mut app = App::new();
@@ -33,7 +34,8 @@ fn main() {
     .add_plugin(ShapePlugin)
     .add_startup_system(setup_system)
     .add_plugin(EisenbahnPlugin)
-    .add_plugin(MousePlugin);
+    .add_plugin(MousePlugin)
+    .add_plugin(ToolPlugin);
 
     app.init_resource::<GameColors>();
 

@@ -23,6 +23,7 @@ fn mouse_movement_system(
     mut mouse: ResMut<MouseState>,
     windows: Res<Windows>,
     q_camera: Query<&GlobalTransform, With<MainCamera>>,
+    buttons: Res<Input<MouseButton>>,
 ) {
     let camera_transform = q_camera.single();
 
@@ -38,3 +39,11 @@ fn mouse_movement_system(
         mouse.window_position = event.position;
     }
 }
+
+//     buttons: Res<Input<MouseButton>>,
+// ) {
+//     if buttons.just_pressed(MouseButton::Left) {
+//         let node_bundle = get_node_bundle(mouse.position, track_graph);
+//         commands.spawn((node_bundle.0, node_bundle.1, OnEdit));
+//     }
+// }

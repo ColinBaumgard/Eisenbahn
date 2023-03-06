@@ -1,9 +1,11 @@
 use crate::{
-    layer, mouse, num, ColorNames, GameColors, MouseState, ORANGE, PURPLE,
+    layer::{self, CURSOR},
+    mouse, num, ColorNames, GameColors, MouseState, ORANGE, PURPLE,
     {TrackEdge, TrackGraph, TrackNode, TrackWeight},
 };
 
 use bevy::{
+    ecs::query::WorldQuery,
     math,
     prelude::*,
     sprite::{Material2d, MaterialMesh2dBundle},
@@ -24,7 +26,32 @@ impl Plugin for EisenbahnPlugin {
         let mut tracks = TrackGraph::new();
         app.insert_resource(tracks);
 
-        app.add_system(mouse_system);
+        app.add_system_set(SystemSet::new().label("draw").with_system(draw_system));
+    }
+}
+
+pub enum DrawActions {
+    Idle,
+    FollowCursor,
+}
+
+#[derive(Component)]
+pub struct DrawTag {
+    pub action: DrawActions,
+}
+
+fn draw_system(
+    mut commands: Commands,
+    mut q_el: Query<(Entity, &DrawTag, &mut Transform)>,
+    mouse: Res<MouseState>,
+) {
+    for (entity, draw_tag, mut transform) in q_el.iter_mut() {
+        match &draw_tag.action {
+            DrawActions::FollowCursor => {
+                transform.translation = mouse.position.extend(layer::CURSOR);
+            }
+            other => (),
+        }
     }
 }
 
@@ -40,17 +67,41 @@ impl Plugin for EisenbahnPlugin {
 // #[derive(Component)]
 // pub struct Position(Vec2);
 
-fn mouse_system(
-    mut commands: Commands,
-    mut track_graph: ResMut<TrackGraph>,
-    mouse: Res<MouseState>,
-    buttons: Res<Input<MouseButton>>,
-) {
-    if buttons.just_pressed(MouseButton::Left) {
-        commands.spawn(get_node_bundle(mouse.position, track_graph));
-    }
-}
+#[derive(Component)]
+pub struct OnEdit;
 
+#[derive(Component)]
+pub struct OnFollow;
+
+// fn mouse_system(
+//     mut commands: Commands,
+//     mut track_graph: ResMut<TrackGraph>,
+//     mouse: Res<MouseState>,
+//     buttons: Res<Input<MouseButton>>,
+// ) {
+//     if buttons.just_pressed(MouseButton::Left) {
+//         let node_bundle = get_node_bundle(mouse.position, track_graph);
+//         commands.spawn((node_bundle.0, node_bundle.1, OnEdit));
+//     }
+// }
+
+// fn track_building_system(
+//     mut commands: Commands,
+//     mut track_graph: ResMut<TrackGraph>,
+//     mouse: Res<MouseState>,
+//     mut q_nodes_on_edit: Query<(Entity, &mut TrackNode, &mut Transform), With<OnEdit>>,
+//     mut q_nodes_on_follow: Query<(Entity, &mut TrackNode, &mut Transform), With<OnFollow>>,
+// ) {
+//     if q_nodes_on_edit == 2 {
+//         for (entity, node, mut transform) in q_nodes_on_edit.iter_mut() {
+//             commands.entity(entity).despawn();
+//             let node_bundle = commands.spawn(get_node_bundle(
+//                 transform.translation.truncate(),
+//                 track_graph,
+//             ));
+//         }
+//     }
+// }
 // fn spawn_node(
 //     mut commands: Commands,
 
@@ -107,13 +158,13 @@ fn mouse_system(
 //     ));
 // }
 
-fn get_node_bundle(pos: Vec2, mut track_graph: ResMut<TrackGraph>) -> (TrackNode, ShapeBundle) {
-    let node_sprite = get_node_shape(pos);
-    let node_index = track_graph.add_node();
-    (TrackNode { id: node_index }, node_sprite)
-}
+// pub fn get_node_bundle(pos: Vec2, mut track_graph: ResMut<TrackGraph>) -> (TrackNode, ShapeBundle) {
+//     let node_sprite = get_node_shape(pos);
+//     let node_index = track_graph.add_node();
+//     (TrackNode { id: node_index }, node_sprite)
+// }
 
-fn get_node_shape(pos: Vec2) -> ShapeBundle {
+pub fn get_node_sprite(pos: Vec2) -> ShapeBundle {
     GeometryBuilder::build_as(
         &shapes::Circle {
             radius: 5.0,
@@ -127,7 +178,7 @@ fn get_node_shape(pos: Vec2) -> ShapeBundle {
     )
 }
 
-fn get_track_shape(pos1: Vec2, pos2: Vec2) -> ShapeBundle {
+pub fn get_track_sprite(pos1: Vec2, pos2: Vec2) -> ShapeBundle {
     GeometryBuilder::build_as(
         &shapes::Line(pos1, pos2),
         DrawMode::Stroke(StrokeMode::new(ORANGE, 2.0)),

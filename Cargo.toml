@@ -9,6 +9,7 @@ edition = "2021"
 bevy = "0.9.1"
 bevy_prototype_lyon = "0.7.2"
 petgraph = "0.6.3"
+itertools = "0.10.5"
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]
