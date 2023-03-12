@@ -100,6 +100,8 @@ pub fn get_node_bundle(
     bevy_prototype_lyon::entity::ShapeBundle,
     bevy_prototype_lyon::draw::Fill,
     bevy_prototype_lyon::draw::Stroke,
+    NormalColor,
+    SelectedColor,
 ) {
     (
         NodeComp,
@@ -108,11 +110,13 @@ pub fn get_node_bundle(
                 radius: 5.0,
                 center: Vec2::ZERO,
             }),
-            transform: Transform::from_translation(pos.extend(layer::TRACKS)),
+            transform: Transform::from_translation(pos.extend(layer::NODES)),
             ..default()
         },
         Fill::color(Color::RED),
         Stroke::new(Color::RED, 2.0),
+        NormalColor(Color::RED),
+        SelectedColor(Color::WHITE),
     )
 }
 
@@ -126,6 +130,8 @@ pub fn get_track_bundle(
     bevy_prototype_lyon::entity::ShapeBundle,
     bevy_prototype_lyon::draw::Fill,
     bevy_prototype_lyon::draw::Stroke,
+    NormalColor,
+    SelectedColor,
 ) {
     (
         EdgeComp {
@@ -141,5 +147,7 @@ pub fn get_track_bundle(
         },
         Fill::color(Color::RED),
         Stroke::new(Color::RED, 2.0),
+        NormalColor(Color::RED),
+        SelectedColor(Color::WHITE),
     )
 }

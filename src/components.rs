@@ -23,3 +23,24 @@ pub struct NodeComp;
 
 #[derive(Component)]
 pub struct Update;
+
+#[derive(Resource)]
+pub struct UpdateSelection {
+    pub entities: Vec<Entity>,
+}
+#[derive(Resource)]
+pub struct RemoveSelection {
+    pub entities: Vec<Entity>,
+}
+
+#[derive(Resource)]
+pub struct DragEnable;
+#[derive(Resource)]
+pub struct SelectEnable;
+
+#[derive(Component)]
+pub struct NormalColor(pub Color);
+#[derive(Component)]
+pub struct SelectedColor(pub Color);
+#[derive(Component)]
+pub struct DraggedColor(pub Color);

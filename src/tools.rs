@@ -29,7 +29,16 @@ impl Plugin for ToolPlugin {
         app.add_systems((tool_wheel_system, selection_system));
 
         app.add_system(move_dragged_system);
-        app.add_system(set_dragged_system.run_if(resource_equals(Tool::TrackBuilder)));
+        app.add_system(
+            set_track_tool_system
+                .run_if(resource_changed::<Tool>())
+                .run_if(resource_equals(Tool::TrackBuilder)),
+        );
+        app.add_system(
+            set_default_system
+                .run_if(resource_changed::<Tool>())
+                .run_if(resource_equals(Tool::None)),
+        );
     }
 }
 
@@ -52,29 +61,6 @@ impl Tool {
             last_el = el;
         }
         last_el
-    }
-}
-
-fn set_dragged_system(
-    mut commands: Commands,
-    q_nodes: Query<(Entity, &Transform, Option<&Dragged>), With<NodeComp>>,
-    mouse: Res<MouseState>,
-    buttons: Res<Input<MouseButton>>,
-) {
-    if buttons.just_pressed(MouseButton::Left) {
-        for (e, t, _) in q_nodes.iter() {
-            let d = t.translation.truncate().distance(mouse.position);
-            if d < 5.0 {
-                commands.entity(e).insert(Dragged);
-                return;
-            }
-        }
-    } else if buttons.just_released(MouseButton::Left) {
-        for (e, t, d) in q_nodes.iter() {
-            if let Some(_) = d {
-                commands.entity(e).remove::<Dragged>();
-            }
-        }
     }
 }
 
@@ -154,6 +140,15 @@ fn ghost_system(
             commands.entity(entity).despawn();
         }
     }
+}
+
+fn set_default_system(mut commands: Commands) {
+    commands.remove_resource::<DragEnable>();
+    commands.insert_resource(SelectEnable);
+}
+fn set_track_tool_system(mut commands: Commands) {
+    commands.insert_resource(DragEnable);
+    commands.insert_resource(SelectEnable);
 }
 
 fn track_tool_system(
