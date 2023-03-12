@@ -1,9 +1,10 @@
 use crate::{
+    components::*,
     draw::*,
     input, layer, num,
     tracks::*,
     ColorNames, GameColors, InputPlugin, MouseState, ORANGE, PURPLE,
-    {TrackComp, TrackGraph, TrackNode, TrackWeight},
+    {EdgeComp, TrackGraph, TrackNode, TrackWeight},
 };
 
 use bevy::{
@@ -13,18 +14,11 @@ use bevy::{
     prelude::*,
     sprite::{Material2d, MaterialMesh2dBundle},
 };
+use bevy_prototype_lyon::{entity::*, prelude::*};
 use itertools::*;
 
 use std::collections::HashMap;
 use std::slice::Iter;
-
-#[derive(Component)]
-pub struct Selected;
-#[derive(Component)]
-pub struct Selectable;
-
-#[derive(Component)]
-pub struct Ghost;
 
 pub struct ToolPlugin;
 impl Plugin for ToolPlugin {
@@ -32,13 +26,10 @@ impl Plugin for ToolPlugin {
         let mut current_tool = Tool::None;
         app.insert_resource(current_tool);
 
-        app.add_systems((
-            tool_wheel_system,
-            selection_system,
-            track_tool_system
-                .after(selection_system)
-                .run_if(resource_equals(Tool::TrackBuilder)),
-        ));
+        app.add_systems((tool_wheel_system, selection_system));
+
+        app.add_system(move_dragged_system);
+        app.add_system(set_dragged_system.run_if(resource_equals(Tool::TrackBuilder)));
     }
 }
 
@@ -61,6 +52,58 @@ impl Tool {
             last_el = el;
         }
         last_el
+    }
+}
+
+fn set_dragged_system(
+    mut commands: Commands,
+    q_nodes: Query<(Entity, &Transform, Option<&Dragged>), With<NodeComp>>,
+    mouse: Res<MouseState>,
+    buttons: Res<Input<MouseButton>>,
+) {
+    if buttons.just_pressed(MouseButton::Left) {
+        for (e, t, _) in q_nodes.iter() {
+            let d = t.translation.truncate().distance(mouse.position);
+            if d < 5.0 {
+                commands.entity(e).insert(Dragged);
+                return;
+            }
+        }
+    } else if buttons.just_released(MouseButton::Left) {
+        for (e, t, d) in q_nodes.iter() {
+            if let Some(_) = d {
+                commands.entity(e).remove::<Dragged>();
+            }
+        }
+    }
+}
+
+fn move_dragged_system(
+    mut commands: Commands,
+    mouse: Res<MouseState>,
+    mut q_dragged_nodes: Query<(Entity, &mut Transform), With<Dragged>>,
+    mut q_tracks: Query<(Entity, &mut Path, &mut EdgeComp)>,
+) {
+    match q_dragged_nodes.get_single_mut() {
+        Ok((dragged_node, mut transform)) => {
+            transform.translation.x = mouse.position.x;
+            transform.translation.y = mouse.position.y;
+            let mut found = false;
+
+            for (entity, mut path, mut edge) in q_tracks.iter_mut() {
+                if edge.a == dragged_node {
+                    edge.pos_a = mouse.position;
+                    found = true;
+                } else if edge.b == dragged_node {
+                    edge.pos_b = mouse.position;
+                    found = true;
+                }
+                if found {
+                    commands.entity(entity).insert(Update);
+                }
+            }
+        }
+        other => (),
     }
 }
 
@@ -120,37 +163,7 @@ fn track_tool_system(
     mouse: Res<MouseState>,
     buttons: Res<Input<MouseButton>>,
     keys: Res<Input<KeyCode>>,
-    q_selected: Query<
-        (Entity, &Transform),
-        (Or<(With<TrackComp>, With<NodeComp>)>, With<Selected>),
-    >,
+    q_selected: Query<(Entity, &Transform), (Or<(With<EdgeComp>, With<NodeComp>)>, With<Selected>)>,
 ) {
-    if buttons.just_pressed(MouseButton::Left) {
-        // for (ghost, _, _) in q_tracks.iter() {
-        //     commands.entity(ghost).despawn();
-        // }
-        let selected = q_selected.get_single();
-        match selected {
-            Err(QuerySingleError::NoEntities(_)) => {
-                let node_sprite_fixed = get_node_sprite(mouse.position);
-                commands.spawn((node_sprite_fixed, Ghost, Selected));
-
-                let node_sprite_next = get_node_sprite(mouse.position);
-                commands.spawn((node_sprite_next, Ghost));
-
-                let track_sprite = get_track_sprite(mouse.position, mouse.position);
-                commands.spawn((track_sprite, FollowCursor, Ghost));
-            }
-            Err(QuerySingleError::MultipleEntities(_)) => {}
-            Ok(selected) => {
-                commands.entity(selected.0).remove::<Selected>();
-                commands.entity(selected.0).remove::<Ghost>();
-                let node_sprite_fixed = get_node_sprite(mouse.position);
-                commands.spawn((node_sprite_fixed, Selected));
-                let track_sprite =
-                    get_track_sprite(selected.1.translation.truncate(), mouse.position);
-                commands.spawn((track_sprite,));
-            }
-        }
-    }
+    if buttons.just_pressed(MouseButton::Left) {}
 }

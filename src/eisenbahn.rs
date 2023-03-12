@@ -4,6 +4,7 @@ use crate::{
     layer::{self, CURSOR},
     num,
     tools::*,
+    tracks::*,
     ColorNames, GameColors, MouseState, ORANGE, PURPLE, {TrackGraph, TrackNode, TrackWeight},
 };
 
@@ -31,7 +32,8 @@ impl Plugin for EisenbahnPlugin {
 
         app.add_plugin(InputPlugin)
             .add_plugin(ToolPlugin)
-            .add_plugin(UIPlugin);
+            .add_plugin(UIPlugin)
+            .add_plugin(TrackPlugin);
     }
 }
 

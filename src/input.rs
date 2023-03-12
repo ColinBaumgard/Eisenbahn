@@ -12,6 +12,7 @@ use std::{any::Any, collections::HashMap};
 pub struct MouseState {
     pub position: Vec2,
     pub window_position: Vec2,
+    pub buttons: Input<MouseButton>,
 }
 
 pub struct InputPlugin;
@@ -39,6 +40,7 @@ fn mouse_movement_system(
         mouse.position = (camera_transform.compute_matrix() * pos.extend(0.0).extend(1.0))
             .truncate()
             .truncate();
+        mouse.buttons = buttons.clone();
     }
 }
 

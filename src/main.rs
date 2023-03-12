@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 #![allow(unused)]
 
-use crate::{eisenbahn::*, graph::*, gui::*, input::*, num::*, tools::*, tracks::*};
+use crate::{components::*, eisenbahn::*, graph::*, gui::*, input::*, num::*, tools::*, tracks::*};
 
 use bevy::{prelude::*, window::WindowResolution};
 use bevy_egui::{egui, EguiContext, EguiPlugin};
@@ -9,6 +9,7 @@ use bevy_prototype_lyon::prelude::*;
 
 use std::{any::Any, collections::HashMap};
 
+mod components;
 mod draw;
 mod eisenbahn;
 mod graph;
