@@ -1,7 +1,12 @@
-use crate::MainCamera;
+use crate::{MainCamera, HEIGHT, WIDTH};
 
-use bevy::prelude::*;
+use bevy::{
+    input::{keyboard::*, ButtonState},
+    prelude::*,
+};
 use bevy_prototype_lyon::prelude::tess::geom::euclid::default;
+
+use std::{any::Any, collections::HashMap};
 
 #[derive(Resource, Default, Debug)]
 pub struct MouseState {
@@ -9,8 +14,8 @@ pub struct MouseState {
     pub window_position: Vec2,
 }
 
-pub struct MousePlugin;
-impl Plugin for MousePlugin {
+pub struct InputPlugin;
+impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.add_system(mouse_movement_system);
 
@@ -21,22 +26,19 @@ impl Plugin for MousePlugin {
 fn mouse_movement_system(
     mut cursor_moved_events: EventReader<CursorMoved>,
     mut mouse: ResMut<MouseState>,
-    windows: Res<Windows>,
     q_camera: Query<&GlobalTransform, With<MainCamera>>,
     buttons: Res<Input<MouseButton>>,
 ) {
     let camera_transform = q_camera.single();
 
     for event in cursor_moved_events.iter() {
-        let window = windows.get(event.id).unwrap();
-        let size = Vec2::new(window.width() as f32, window.height() as f32);
+        let size = Vec2::new(WIDTH, HEIGHT);
         let pos = event.position - size / 2.0;
 
+        mouse.window_position = event.position;
         mouse.position = (camera_transform.compute_matrix() * pos.extend(0.0).extend(1.0))
             .truncate()
             .truncate();
-
-        mouse.window_position = event.position;
     }
 }
 

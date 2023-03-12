@@ -1,7 +1,10 @@
 use crate::{
+    gui::*,
+    input::*,
     layer::{self, CURSOR},
-    mouse, num, ColorNames, GameColors, MouseState, ORANGE, PURPLE,
-    {TrackEdge, TrackGraph, TrackNode, TrackWeight},
+    num,
+    tools::*,
+    ColorNames, GameColors, MouseState, ORANGE, PURPLE, {TrackGraph, TrackNode, TrackWeight},
 };
 
 use bevy::{
@@ -26,32 +29,9 @@ impl Plugin for EisenbahnPlugin {
         let mut tracks = TrackGraph::new();
         app.insert_resource(tracks);
 
-        app.add_system_set(SystemSet::new().label("draw").with_system(draw_system));
-    }
-}
-
-pub enum DrawActions {
-    Idle,
-    FollowCursor,
-}
-
-#[derive(Component)]
-pub struct DrawTag {
-    pub action: DrawActions,
-}
-
-fn draw_system(
-    mut commands: Commands,
-    mut q_el: Query<(Entity, &DrawTag, &mut Transform)>,
-    mouse: Res<MouseState>,
-) {
-    for (entity, draw_tag, mut transform) in q_el.iter_mut() {
-        match &draw_tag.action {
-            DrawActions::FollowCursor => {
-                transform.translation = mouse.position.extend(layer::CURSOR);
-            }
-            other => (),
-        }
+        app.add_plugin(InputPlugin)
+            .add_plugin(ToolPlugin)
+            .add_plugin(UIPlugin);
     }
 }
 
@@ -66,12 +46,6 @@ fn draw_system(
 
 // #[derive(Component)]
 // pub struct Position(Vec2);
-
-#[derive(Component)]
-pub struct OnEdit;
-
-#[derive(Component)]
-pub struct OnFollow;
 
 // fn mouse_system(
 //     mut commands: Commands,
@@ -163,25 +137,10 @@ pub struct OnFollow;
 //     let node_index = track_graph.add_node();
 //     (TrackNode { id: node_index }, node_sprite)
 // }
+// ShapeBundle {
+//     GeometryBuilder::build_as(
+//         Fill::color(Color::RED),
+//         Stroke::new(Color::RED, 2.0),
+//         Transform::from_translation(pos.extend(layer::TRACKS)),
 
-pub fn get_node_sprite(pos: Vec2) -> ShapeBundle {
-    GeometryBuilder::build_as(
-        &shapes::Circle {
-            radius: 5.0,
-            center: Vec2::splat(0.0),
-        },
-        DrawMode::Outlined {
-            fill_mode: FillMode::color(Color::RED),
-            outline_mode: StrokeMode::new(Color::RED, 2.0),
-        },
-        Transform::from_translation(pos.extend(layer::TRACKS)),
-    )
-}
-
-pub fn get_track_sprite(pos1: Vec2, pos2: Vec2) -> ShapeBundle {
-    GeometryBuilder::build_as(
-        &shapes::Line(pos1, pos2),
-        DrawMode::Stroke(StrokeMode::new(ORANGE, 2.0)),
-        Transform::from_xyz(0.0, 0.0, layer::TRACKS),
-    )
-}
+// }
