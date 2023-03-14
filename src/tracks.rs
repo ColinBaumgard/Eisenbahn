@@ -102,6 +102,7 @@ pub fn get_node_bundle(
     bevy_prototype_lyon::draw::Stroke,
     NormalColor,
     SelectedColor,
+    GhostColor,
 ) {
     (
         NodeComp,
@@ -117,6 +118,7 @@ pub fn get_node_bundle(
         Stroke::new(Color::RED, 2.0),
         NormalColor(Color::RED),
         SelectedColor(Color::WHITE),
+        GhostColor(Color::ORANGE),
     )
 }
 
@@ -132,6 +134,7 @@ pub fn get_track_bundle(
     bevy_prototype_lyon::draw::Stroke,
     NormalColor,
     SelectedColor,
+    GhostColor,
 ) {
     (
         EdgeComp {
@@ -149,5 +152,6 @@ pub fn get_track_bundle(
         Stroke::new(Color::RED, 2.0),
         NormalColor(Color::RED),
         SelectedColor(Color::WHITE),
+        GhostColor(Color::ORANGE),
     )
 }

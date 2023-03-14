@@ -44,3 +44,44 @@ pub struct NormalColor(pub Color);
 pub struct SelectedColor(pub Color);
 #[derive(Component)]
 pub struct DraggedColor(pub Color);
+#[derive(Component)]
+pub struct GhostColor(pub Color);
+
+pub struct LeftMouseEvent;
+
+pub enum GhostAction {
+    Add,
+    Remove,
+    Deghost,
+    Update,
+}
+pub struct GhostEvent {
+    pub action: GhostAction,
+    pub entities: Vec<Entity>,
+}
+impl GhostEvent {
+    pub fn add(entities: Vec<Entity>) -> GhostEvent {
+        GhostEvent {
+            action: GhostAction::Add,
+            entities: entities,
+        }
+    }
+    pub fn update(entities: Vec<Entity>) -> GhostEvent {
+        GhostEvent {
+            action: GhostAction::Update,
+            entities: entities,
+        }
+    }
+    pub fn remove(entities: Vec<Entity>) -> GhostEvent {
+        GhostEvent {
+            action: GhostAction::Remove,
+            entities: entities,
+        }
+    }
+    pub fn deghost(entities: Vec<Entity>) -> GhostEvent {
+        GhostEvent {
+            action: GhostAction::Deghost,
+            entities: entities,
+        }
+    }
+}

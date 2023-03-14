@@ -1,8 +1,9 @@
-use crate::{MainCamera, HEIGHT, WIDTH};
+use crate::{components::LeftMouseEvent, MainCamera, HEIGHT, WIDTH};
 
 use bevy::{
     input::{keyboard::*, ButtonState},
     prelude::*,
+    utils::tracing::event,
 };
 use bevy_prototype_lyon::prelude::tess::geom::euclid::default;
 
@@ -21,6 +22,8 @@ impl Plugin for InputPlugin {
         app.add_system(mouse_movement_system);
 
         app.init_resource::<MouseState>();
+
+        app.add_event::<LeftMouseEvent>();
     }
 }
 
@@ -29,6 +32,7 @@ fn mouse_movement_system(
     mut mouse: ResMut<MouseState>,
     q_camera: Query<&GlobalTransform, With<MainCamera>>,
     buttons: Res<Input<MouseButton>>,
+    mut ev_left: EventWriter<LeftMouseEvent>,
 ) {
     let camera_transform = q_camera.single();
 
@@ -41,6 +45,18 @@ fn mouse_movement_system(
             .truncate()
             .truncate();
         mouse.buttons = buttons.clone();
+    }
+    if buttons.just_pressed(MouseButton::Left) {
+        ev_left.send(LeftMouseEvent);
+    }
+}
+
+pub fn pop_event<T: bevy::prelude::Event>(mut event_reader: EventReader<T>) -> bool {
+    if event_reader.is_empty() {
+        false
+    } else {
+        event_reader.clear();
+        true
     }
 }
 
