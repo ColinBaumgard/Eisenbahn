@@ -5,8 +5,6 @@ use petgraph::graphmap::*;
 pub struct Dragged;
 
 #[derive(Component)]
-pub struct Selected;
-#[derive(Component)]
 pub struct Selectable;
 
 #[derive(Component)]
@@ -111,3 +109,9 @@ pub struct Moved;
 
 #[derive(Resource)]
 pub struct TrackGraph(pub UnGraphMap<Entity, Entity>);
+
+#[derive(Component)]
+pub struct AttractionRing(pub Entity);
+
+#[derive(Component)]
+pub struct Selected;
