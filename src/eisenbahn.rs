@@ -6,7 +6,7 @@ use crate::{
     num,
     tools::*,
     tracks::*,
-    ColorNames, GameColors, MouseState, ORANGE, PURPLE, {TrackGraph, TrackNode, TrackWeight},
+    ColorNames, GameColors, MouseState, ORANGE, PURPLE,
 };
 
 use bevy::{
@@ -27,9 +27,6 @@ pub struct EisenbahnPlugin;
 impl Plugin for EisenbahnPlugin {
     fn build(&self, app: &mut App) {
         // app.add_startup_system(initialise_world);
-
-        let mut tracks = TrackGraph::new();
-        app.insert_resource(tracks);
 
         app.add_plugin(InputPlugin)
             .add_plugin(ToolPlugin)

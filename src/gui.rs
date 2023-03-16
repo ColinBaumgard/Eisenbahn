@@ -1,4 +1,4 @@
-use crate::{MouseState, Tool};
+use crate::{components::TrackEditorMode, MouseState, Tool};
 
 use std::str::FromStr;
 
@@ -24,6 +24,7 @@ fn ui_example(
     time: Res<Time>,
     mouse: Res<MouseState>,
     current_tool: Res<Tool>,
+    editor_mode: Option<Res<TrackEditorMode>>,
 ) {
     let delta_seconds = time.raw_delta_seconds_f64();
     if delta_seconds == 0.0 {
@@ -38,5 +39,10 @@ fn ui_example(
         ui.label(format!("fps : {fps:.1}"));
         ui.label(format!("mouse : ({mouse_x:.1}, {mouse_y:.1})"));
         ui.label(format!("tool : {tool:?}"));
+        if editor_mode.is_some() {
+            let mode_res = editor_mode.unwrap();
+            let mode = mode_res.as_ref();
+            ui.label(format!("mode : {mode:?}"));
+        }
     });
 }

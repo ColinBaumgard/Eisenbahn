@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use petgraph::graphmap::*;
 
 #[derive(Component)]
 pub struct Dragged;
@@ -10,6 +11,8 @@ pub struct Selectable;
 
 #[derive(Component)]
 pub struct Ghost;
+#[derive(Component)]
+pub struct ActiveGhost;
 
 #[derive(Component)]
 pub struct EdgeComp {
@@ -85,3 +88,26 @@ impl GhostEvent {
         }
     }
 }
+
+// New components :
+
+#[derive(Resource, Debug)]
+pub enum Tool {
+    Viewer,
+    TrackEditor,
+}
+
+#[derive(Resource, Debug, PartialEq)]
+pub enum TrackEditorMode {
+    Idle,
+    PathBuilding,
+}
+
+#[derive(Component)]
+pub struct HookedOnCursor;
+
+#[derive(Component)]
+pub struct Moved;
+
+#[derive(Resource)]
+pub struct TrackGraph(pub UnGraphMap<Entity, Entity>);

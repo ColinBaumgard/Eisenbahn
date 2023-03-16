@@ -4,7 +4,6 @@ use crate::{
     input, layer, num,
     tracks::*,
     ColorNames, GameColors, InputPlugin, MouseState, ORANGE, PURPLE,
-    {EdgeComp, TrackGraph, TrackNode, TrackWeight},
 };
 
 use bevy::{
@@ -20,355 +19,109 @@ use itertools::*;
 use std::collections::HashMap;
 use std::slice::Iter;
 
+use petgraph::graphmap::*;
+
 pub struct ToolPlugin;
 impl Plugin for ToolPlugin {
     fn build(&self, app: &mut App) {
-        let mut current_tool = Tool::None;
+        let mut current_tool = Tool::TrackEditor;
         app.insert_resource(current_tool);
 
-        app.add_systems((tool_wheel_system, selection_system));
+        app.insert_resource(TrackGraph(UnGraphMap::new()));
 
-        app.add_system(move_dragged_system);
-
-        app.add_system(
-            set_track_tool_system
-                .run_if(resource_changed::<Tool>())
-                .run_if(resource_equals(Tool::TrackBuilder)),
-        );
-        app.add_systems((
-            track_tool_selection_system.run_if(resource_equals(Tool::TrackBuilder)),
-            track_tool_ghost_system
-                .run_if(resource_equals(Tool::TrackBuilder))
-                .after(track_tool_selection_system),
-        ));
+        app.add_startup_system(init_track_editor_system);
 
         app.add_systems((
-            update_selection_system.run_if(resource_exists::<UpdateSelection>()),
-            remove_selection_system.run_if(resource_exists::<RemoveSelection>()),
-            update_ghost_system,
+            update_hooked_on_cursor_system,
+            update_tracks_system,
+            track_editor_idle_system
+                .run_if(resource_exists_and_equals(TrackEditorMode::Idle))
+                .before(update_hooked_on_cursor_system),
+            track_editor_building_system
+                .run_if(resource_exists_and_equals(TrackEditorMode::PathBuilding))
+                .before(update_hooked_on_cursor_system),
         ));
-
-        app.add_event::<GhostEvent>();
-
-        // app.add_system(
-        //     set_default_system
-        //         .run_if(resource_changed::<Tool>())
-        //         .run_if(resource_equals(Tool::None)),
-        // );
     }
 }
 
-fn track_tool_ghost_system(
+fn init_track_editor_system(mut commands: Commands) {
+    let mut mode = TrackEditorMode::Idle;
+    commands.insert_resource(mode);
+}
+
+fn update_hooked_on_cursor_system(
     mut commands: Commands,
     mouse: Res<MouseState>,
-    mut ev_left: EventReader<LeftMouseEvent>,
-    q_nodes: Query<(Entity, &Transform, Option<&Selected>), With<NodeComp>>,
-    mut ev_ghost: EventWriter<GhostEvent>,
-    keys: Res<Input<KeyCode>>,
+    mut q_hooked: Query<(Entity, &mut Transform), With<HookedOnCursor>>,
 ) {
-    if !ev_left.is_empty() {
-        let mut selected_nodes = Vec::new();
-        for (e, t, is_selected) in q_nodes.iter() {
-            let d = t.translation.truncate().distance(mouse.position);
-            if d < 10.0 {
-                return;
-            }
-            if let Some(_) = is_selected {
-                selected_nodes.push((e, t.translation.truncate()));
-            }
-        }
-        if selected_nodes.len() == 0 {
-            let mut node = get_node_bundle(mouse.position);
-            let e = commands.spawn((node)).id();
-            commands.insert_resource(UpdateSelection { entities: vec![e] });
-            ev_ghost.send(GhostEvent::update(vec![e]));
-            ev_left.clear();
-            println!("Spawned new node");
-        } else if selected_nodes.len() == 1 {
-            let mut node = get_node_bundle(mouse.position);
-            let e_node = commands.spawn(node).insert(FollowCursor).id();
-            let mut track = get_track_bundle(
-                selected_nodes[0].0,
-                e_node,
-                &selected_nodes[0].1,
-                &mouse.position,
-            );
-            let e_track = commands.spawn(track).id();
-            ev_ghost.send(GhostEvent::add(vec![e_node, e_track]))
-        }
+    for (e, mut transform) in q_hooked.iter_mut() {
+        transform.translation.x = mouse.position.x;
+        transform.translation.y = mouse.position.y;
+        commands.entity(e).insert(Moved);
     }
-    if keys.just_pressed(KeyCode::Escape) {
-        ev_ghost.send(GhostEvent::remove(Vec::new()));
-    }
-    // else if buttons.just_released(MouseButton::Left) {
-    //     for (e, t, d, _) in q_nodes.iter() {
-    //         if let Some(_) = d {
-    //             commands.entity(e).remove::<Dragged>();
-    //         }
-    //     }
-    // }
-
-    // if buttons.just_pressed(MouseButton::Left) {
-    //     let selected_node = match q_selected.get_single() {
-    //         Ok(e) => e,
-    //         Err(QuerySingleError::NoEntities(_)) => commands
-    //             .spawn(get_node_bundle(mouse.position))
-    //             .insert(Selected)
-    //             .insert(Dragged)
-    //             .id(),
-    //         Err(QuerySingleError::MultipleEntities(_)) => {
-    //             return;
-    //         }
-    //     };
-    // }
 }
-fn track_tool_selection_system(
+
+fn update_tracks_system(
     mut commands: Commands,
-    mouse: Res<MouseState>,
-    mut ev_left: EventReader<LeftMouseEvent>,
-    keys: Res<Input<KeyCode>>,
-    q_nodes: Query<(Entity, &Transform), With<NodeComp>>,
+    mut q_moved_nodes: Query<(Entity, &Transform), (With<Moved>, With<NodeComp>)>,
+    mut q_tracks: Query<(Entity, &mut EdgeComp, &mut Path)>,
+    graph: Res<TrackGraph>,
 ) {
-    if !ev_left.is_empty() {
-        for (e, t) in q_nodes.iter() {
-            let d = t.translation.truncate().distance(mouse.position);
-            if d < 10.0 {
-                commands.insert_resource(UpdateSelection { entities: vec![e] });
-                ev_left.clear();
-                println!("{:?}", ev_left.is_empty());
-                return;
-            }
-        }
-    }
-    if keys.just_pressed(KeyCode::Escape) {
-        commands.insert_resource(RemoveSelection {
-            entities: Vec::new(),
-        });
-    }
-}
-
-#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Tool {
-    TrackBuilder,
-    None,
-}
-impl Tool {
-    pub fn as_vec() -> Vec<Tool> {
-        Vec::from([Tool::None, Tool::TrackBuilder])
-    }
-    pub fn next(current_tool: &Tool) -> Tool {
-        let mut last_el = *Tool::as_vec().last().unwrap();
-        let mut iter = Tool::as_vec();
-        for el in iter {
-            if last_el == *current_tool {
-                return el;
-            }
-            last_el = el;
-        }
-        last_el
-    }
-}
-
-fn move_dragged_system(
-    mut commands: Commands,
-    mouse: Res<MouseState>,
-    mut q_dragged_nodes: Query<(Entity, &mut Transform), With<Dragged>>,
-    mut q_tracks: Query<(Entity, &mut Path, &mut EdgeComp)>,
-) {
-    match q_dragged_nodes.get_single_mut() {
-        Ok((dragged_node, mut transform)) => {
-            transform.translation.x = mouse.position.x;
-            transform.translation.y = mouse.position.y;
-            let mut found = false;
-
-            for (entity, mut path, mut edge) in q_tracks.iter_mut() {
-                if edge.a == dragged_node {
-                    edge.pos_a = mouse.position;
-                    found = true;
-                } else if edge.b == dragged_node {
-                    edge.pos_b = mouse.position;
-                    found = true;
+    for (node_e, node_t) in q_moved_nodes.iter() {
+        let affected_edges = graph.0.edges(node_e);
+        for (from, to, edge) in affected_edges {
+            let get_result = q_tracks.get_mut(*edge);
+            if get_result.is_ok() {
+                let (_, mut edge_comp, mut path) = get_result.unwrap();
+                if from == node_e {
+                    edge_comp.pos_a = node_t.translation.truncate();
+                } else {
+                    edge_comp.pos_b = node_t.translation.truncate();
                 }
-                if found {
-                    commands.entity(entity).insert(Update);
-                }
+                let mut path_builder = PathBuilder::new();
+                path_builder.move_to(edge_comp.pos_a);
+                path_builder.line_to(edge_comp.pos_b);
+                *path = path_builder.build();
             }
         }
-        other => (),
+        commands.entity(node_e).remove::<Moved>();
     }
 }
 
-fn tool_wheel_system(
+fn track_editor_idle_system(
     mut commands: Commands,
-    mut current_tool: ResMut<Tool>,
-    mut key_evr: EventReader<KeyboardInput>,
-    mut q_ghost: Query<(Entity), With<Ghost>>,
-) {
-    for ev in key_evr.iter() {
-        match ev.state {
-            ButtonState::Pressed => match ev.key_code {
-                Some(KeyCode::Tab) => {
-                    *current_tool.as_mut() = Tool::next(current_tool.as_ref());
-                    for entity in q_ghost.iter() {
-                        commands.entity(entity).despawn();
-                    }
-                }
-                other => (),
-            },
-            ButtonState::Released => {}
-        }
-    }
-}
-
-fn is_tool(current_tool: Res<Tool>, tool: &Tool) -> bool {
-    current_tool.as_ref() == tool
-}
-
-fn selection_system(
-    mut commands: Commands,
-    q_selectable: Query<Entity, With<Selectable>>,
-    keys: Res<Input<KeyCode>>,
-) {
-    if keys.just_pressed(KeyCode::Escape) {
-        for entity in q_selectable.iter() {
-            commands.entity(entity).remove::<Selected>();
-        }
-    }
-}
-fn ghost_system(
-    mut commands: Commands,
-    q_ghosted: Query<Entity, With<Ghost>>,
-    keys: Res<Input<KeyCode>>,
-) {
-    if keys.just_pressed(KeyCode::Escape) {
-        for entity in q_ghosted.iter() {
-            commands.entity(entity).despawn();
-        }
-    }
-}
-
-fn set_default_system(mut commands: Commands) {
-    commands.remove_resource::<DragEnable>();
-    commands.insert_resource(SelectEnable);
-}
-fn set_track_tool_system(mut commands: Commands) {
-    commands.insert_resource(DragEnable);
-    commands.insert_resource(SelectEnable);
-}
-
-fn interaction_system(
-    mut commands: Commands,
-    q_nodes: Query<(Entity, &Transform, Option<&Dragged>, Option<&Selected>), With<NodeComp>>,
     mouse: Res<MouseState>,
     buttons: Res<Input<MouseButton>>,
-    select_enable: Option<Res<SelectEnable>>,
-    drag_enable: Option<Res<DragEnable>>,
+    mut graph: ResMut<TrackGraph>,
 ) {
     if buttons.just_pressed(MouseButton::Left) {
-        for (e, t, _, is_selected) in q_nodes.iter() {
-            let d = t.translation.truncate().distance(mouse.position);
-            if d < 5.0 {
-                if let Some(_) = drag_enable {
-                    commands.entity(e).insert(Dragged);
-                }
-                if let Some(_) = select_enable {
-                    commands.insert_resource(UpdateSelection { entities: vec![e] });
-                }
-                return;
-            }
-        }
-        commands.insert_resource(RemoveSelection {
-            entities: Vec::new(),
-        });
-    }
-}
+        let node = get_node_bundle(mouse.position);
+        let node_e = commands.spawn(node).id();
+        graph.0.add_node(node_e);
 
-fn update_selection_system(
-    mut commands: Commands,
-    selection: Res<UpdateSelection>,
-    mut q_selected: Query<(Entity, &mut Stroke, &NormalColor, &SelectedColor)>,
-) {
-    for (e, mut stroke, n_c, s_c) in q_selected.iter_mut() {
-        if selection.entities.contains(&e) {
-            commands.entity(e).insert(Selected);
-            stroke.color = s_c.0;
-        } else {
-            commands.entity(e).remove::<Selected>();
-            stroke.color = n_c.0;
-        }
+        let node2 = get_node_bundle(mouse.position);
+        let node2_e = commands.spawn((node2, HookedOnCursor)).id();
+        graph.0.add_node(node2_e);
+
+        let track = get_track_bundle(node_e, node2_e, &mouse.position, &mouse.position);
+        let track_e = commands.spawn((track)).id();
+        graph.0.add_edge(node_e, node2_e, track_e);
+
+        commands.insert_resource(TrackEditorMode::PathBuilding);
     }
-    commands.remove_resource::<UpdateSelection>();
 }
-fn remove_selection_system(
+fn track_editor_building_system(
     mut commands: Commands,
-    selection: Res<RemoveSelection>,
-    mut q_selected: Query<(Entity, &mut Stroke, &NormalColor, &SelectedColor)>,
+    mouse: Res<MouseState>,
+    buttons: Res<Input<MouseButton>>,
+    keys: Res<Input<KeyCode>>,
+    mut graph: ResMut<TrackGraph>,
+    q_hooked: Query<Entity, With<HookedOnCursor>>,
 ) {
-    for (e, mut stroke, n_c, s_c) in q_selected.iter_mut() {
-        if selection.entities.contains(&e) || selection.entities.len() == 0 {
-            commands.entity(e).remove::<Selected>();
-            stroke.color = n_c.0;
-        }
+    if buttons.just_pressed(MouseButton::Left) {
+        let hooked = q_hooked.single();
+        commands.entity(hooked).remove::<HookedOnCursor>();
+        commands.insert_resource(TrackEditorMode::Idle);
+    } else if keys.just_pressed(KeyCode::Escape) {
     }
-    commands.remove_resource::<RemoveSelection>();
 }
-fn update_ghost_system(
-    mut commands: Commands,
-    mut g_events: EventReader<GhostEvent>,
-    mut q_all: Query<(Entity, &mut Fill, &NormalColor, &GhostColor, Option<&Ghost>)>,
-) {
-    for ev in g_events.iter() {
-        match ev.action {
-            GhostAction::Add => {
-                for (e, mut fill, n_c, g_c, is_ghosted) in q_all.iter_mut() {
-                    if ev.entities.contains(&e) {
-                        commands.entity(e).insert(Ghost);
-                        fill.color = g_c.0;
-                    }
-                }
-            }
-            GhostAction::Update => {
-                for (e, mut fill, n_c, g_c, is_ghosted) in q_all.iter_mut() {
-                    if ev.entities.contains(&e) {
-                        commands.entity(e).insert(Ghost);
-                        fill.color = g_c.0;
-                    } else {
-                        commands.entity(e).remove::<Ghost>();
-                        fill.color = n_c.0;
-                    }
-                }
-            }
-            GhostAction::Remove => {
-                for (e, mut fill, n_c, g_c, is_ghosted) in q_all.iter_mut() {
-                    if (ev.entities.contains(&e) || ev.entities.len() == 0) && is_ghosted.is_some()
-                    {
-                        commands.entity(e).despawn();
-                    }
-                }
-            }
-            GhostAction::Deghost => {
-                for (e, mut fill, n_c, g_c, is_ghosted) in q_all.iter_mut() {
-                    if (ev.entities.contains(&e) || ev.entities.len() == 0) && is_ghosted.is_some()
-                    {
-                        commands.entity(e).remove::<Ghost>();
-                        fill.color = n_c.0;
-                    }
-                }
-            }
-        }
-    }
-    g_events.clear();
-}
-// fn remove_selection_system(
-//     mut commands: Commands,
-//     selection: Res<RemoveSelection>,
-//     mut q_selected: Query<(Entity, &mut Stroke, &NormalColor, &SelectedColor)>,
-// ) {
-//     for (e, mut stroke, n_c, s_c) in q_selected.iter_mut() {
-//         if selection.entities.contains(&e) || selection.entities.len() == 0 {
-//             commands.entity(e).remove::<Selected>();
-//             stroke.color = n_c.0;
-//         }
-//     }
-//     commands.remove_resource::<RemoveSelection>();
-// }
