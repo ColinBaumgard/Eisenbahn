@@ -26,6 +26,7 @@ fn ui_example(
     current_tool: Res<Tool>,
     editor_mode: Option<Res<TrackEditorMode>>,
 ) {
+    let game_time = time.elapsed_seconds();
     let delta_seconds = time.raw_delta_seconds_f64();
     if delta_seconds == 0.0 {
         return;
@@ -36,6 +37,7 @@ fn ui_example(
     let tool = current_tool.as_ref();
 
     egui::Window::new("Debug").show(contexts.ctx_mut(), |ui| {
+        ui.label(format!("time : {game_time:.1}"));
         ui.label(format!("fps : {fps:.1}"));
         ui.label(format!("mouse : ({mouse_x:.1}, {mouse_y:.1})"));
         ui.label(format!("tool : {tool:?}"));

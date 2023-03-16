@@ -1,6 +1,8 @@
 use crate::{
+    building::*,
     components::*,
     gui::*,
+    in_game_components::*,
     input::*,
     layer::{self, CURSOR},
     num,
@@ -17,32 +19,32 @@ use bevy::{
 };
 
 use bevy_prototype_lyon::{entity::*, prelude::*};
-use petgraph::{
-    graphmap::GraphMap,
-    stable_graph::{EdgeIndex, EdgeIndices, EdgeReference, NodeIndex, NodeIndices, StableGraph},
-    Undirected,
-};
+use petgraph::graphmap::*;
 use std::collections::HashMap;
 pub struct EisenbahnPlugin;
 impl Plugin for EisenbahnPlugin {
     fn build(&self, app: &mut App) {
-        // app.add_startup_system(initialise_world);
+        app.add_startup_system(initialise_world);
+
+        app.insert_resource(TrackGraph(UnGraphMap::new()));
 
         app.add_plugin(InputPlugin)
             .add_plugin(ToolPlugin)
             .add_plugin(UIPlugin)
-            .add_plugin(TrackPlugin);
+            .add_plugin(TrackPlugin)
+            .add_plugin(BuildingPlugin);
     }
 }
 
-// fn initialise_world(
-//     mut commands: Commands,
-//     game_colors: Res<GameColors>,
-//     mut track_graph: ResMut<TrackGraph>,
-//     mut meshes: ResMut<Assets<Mesh>>,
-//     mut materials: ResMut<Assets<ColorMaterial>>,
-// ) {
-// }
+fn initialise_world(mut commands: Commands) {
+    let f_a = Building::a_factory();
+    let f_a_sprite = get_building_sprite_bundle(Vec2 { x: -200.0, y: 0.0 });
+    commands.spawn((f_a, f_a_sprite));
+
+    let f_b = Building::b_factory();
+    let f_b_sprite = get_building_sprite_bundle(Vec2 { x: 200.0, y: 0.0 });
+    commands.spawn((f_b, f_b_sprite));
+}
 
 // #[derive(Component)]
 // pub struct Position(Vec2);

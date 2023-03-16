@@ -9,11 +9,13 @@ use bevy_prototype_lyon::prelude::*;
 
 use std::{any::Any, collections::HashMap};
 
+mod building;
 mod components;
 mod draw;
 mod eisenbahn;
 mod graph;
 mod gui;
+mod in_game_components;
 mod input;
 mod layer;
 mod num;
