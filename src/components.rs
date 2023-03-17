@@ -78,3 +78,6 @@ pub struct AttractionRing(pub Entity);
 
 #[derive(Component)]
 pub struct Selected;
+
+#[derive(Resource, Clone, Copy)]
+pub struct MainWindowSize(pub Vec2);

@@ -1,3 +1,5 @@
+use bevy::prelude::*;
+use bevy_egui::egui;
 use std::ops::Add;
 
 pub const PI: f32 = 3.14159265358979323846;
@@ -32,6 +34,10 @@ fn test_contain() {
     assert!(range.contain(0.5));
     assert!(range.contain(-0.5));
     assert!(!range.contain(-1.5));
+}
+
+pub fn vec2_to_pos2(pos: Vec2, window_size: Vec2) -> egui::Pos2 {
+    egui::Pos2::new(pos.x + window_size.x / 2.0, window_size.y / 2.0 - pos.y)
 }
 
 #[test]

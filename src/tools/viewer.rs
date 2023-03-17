@@ -3,7 +3,8 @@ use crate::{
     components::{self, *},
     draw::*,
     in_game_components::*,
-    input, layer, num,
+    input, layer,
+    num::{self, vec2_to_pos2},
     tracks::*,
     ColorNames, GameColors, InputPlugin, MouseState, ORANGE, PURPLE,
 };
@@ -15,6 +16,7 @@ use bevy::{
     prelude::*,
     sprite::{Material2d, MaterialMesh2dBundle},
 };
+use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
 pub struct ViewerPlugin;
 impl Plugin for ViewerPlugin {
@@ -38,9 +40,13 @@ impl Plugin for ViewerPlugin {
 fn enter_system(
     mut commands: Commands,
     q_nodes: Query<Entity, (With<NodeComp>, Without<Building>)>,
+    q_bubble: Query<Entity, With<InfoBubble>>,
 ) {
     for e in q_nodes.iter() {
         commands.entity(e).insert(Visibility::Hidden);
+    }
+    for e in q_bubble.iter() {
+        commands.entity(e).despawn();
     }
 }
 
@@ -52,20 +58,30 @@ fn exit_system(mut commands: Commands, q_to_be_deselected: Query<Entity, With<Se
 
 fn building_info_system(
     mut commands: Commands,
+    mut contexts: EguiContexts,
+    window_size: Res<MainWindowSize>,
+    mouse: Res<MouseState>,
     q_bubble: Query<Entity, With<InfoBubble>>,
     q_building: Query<(Entity, &Building, &Transform), With<Selected>>,
     asset_server: Res<AssetServer>,
 ) {
-    for e in q_bubble.iter() {
-        commands.entity(e).despawn();
-    }
-    for (e, b, t) in q_building.iter() {
-        let info_bubble = get_info_bubble(
-            t.translation.truncate(),
-            b,
-            asset_server.load("fonts/FiraSans-Bold.ttf"),
-        );
-        commands.spawn(info_bubble);
+    for (e, building, transform) in q_building.iter() {
+        let mut lines = Vec::new();
+        for (name, data) in &building.resources {
+            let (stock, max_stock) = (data.stock, data.max_stock);
+            lines.push(format!("{name:} : {stock:.0}/{max_stock:.0}"));
+        }
+        lines.sort();
+        egui::Window::new(building.name.clone())
+            .current_pos(vec2_to_pos2(
+                transform.translation.truncate(),
+                window_size.0,
+            ))
+            .show(contexts.ctx_mut(), |ui| {
+                for line in lines {
+                    ui.label(line);
+                }
+            });
     }
 }
 

@@ -25,8 +25,11 @@ mod tracks;
 fn main() {
     let mut app = App::new();
 
+    let window_size = MainWindowSize(Vec2::new(1200.0, 800.0));
+    app.insert_resource(window_size);
+
     let window = Some(Window {
-        resolution: WindowResolution::new(WIDTH, HEIGHT),
+        resolution: WindowResolution::new(window_size.0.x, window_size.0.y),
 
         ..default()
     });

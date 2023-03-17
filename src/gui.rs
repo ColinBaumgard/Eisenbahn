@@ -5,21 +5,22 @@ use std::str::FromStr;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_prototype_lyon::prelude::tess::geom::euclid::default;
-
 pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(EguiPlugin);
+        app.add_plugin(EguiPlugin)
+            .add_plugin(WorldInspectorPlugin::new());
 
-        app.add_system(ui_example);
+        app.add_system(ui_debug);
     }
 }
 
 #[derive(Component)]
 struct FpsCounter;
 
-fn ui_example(
+fn ui_debug(
     mut contexts: EguiContexts,
     time: Res<Time>,
     mouse: Res<MouseState>,
