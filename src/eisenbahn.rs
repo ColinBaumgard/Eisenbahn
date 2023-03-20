@@ -6,6 +6,7 @@ use crate::{
     input::*,
     layer::{self, CURSOR},
     num,
+    terrain::*,
     tools::*,
     tracks::*,
     ColorNames, GameColors, MouseState, ORANGE, PURPLE,
@@ -32,7 +33,8 @@ impl Plugin for EisenbahnPlugin {
             .add_plugin(ToolPlugin)
             .add_plugin(UIPlugin)
             .add_plugin(TrackPlugin)
-            .add_plugin(BuildingPlugin);
+            .add_plugin(BuildingPlugin)
+            .add_plugin(TerrainPlugin);
     }
 }
 

@@ -10,8 +10,8 @@ use bevy_prototype_lyon::prelude::tess::geom::euclid::default;
 pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(EguiPlugin)
-            .add_plugin(WorldInspectorPlugin::new());
+        app.add_plugin(EguiPlugin);
+        // .add_plugin(WorldInspectorPlugin::new());
 
         app.add_system(ui_debug);
     }

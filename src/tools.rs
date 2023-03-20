@@ -1,9 +1,11 @@
 use crate::components::*;
 
 mod track_editor;
+mod train_editor;
 mod viewer;
 
 use crate::tools::track_editor::*;
+use crate::tools::train_editor::*;
 use crate::tools::viewer::*;
 
 use bevy::{
@@ -23,6 +25,7 @@ impl Plugin for ToolPlugin {
         app.insert_resource(Tool::Viewer);
 
         app.add_plugin(TrackEditorPlugin);
+        app.add_plugin(TrainEditorPlugin);
         app.add_plugin(ViewerPlugin);
 
         app.add_system(tool_wheel_system);
@@ -31,7 +34,7 @@ impl Plugin for ToolPlugin {
 
 impl Tool {
     pub fn as_vec() -> Vec<Tool> {
-        Vec::from([Tool::Viewer, Tool::TrackEditor])
+        Vec::from([Tool::Viewer, Tool::TrackEditor, Tool::TrainEditor])
     }
     pub fn next(current_tool: &Tool) -> Tool {
         let mut last_el = *Tool::as_vec().last().unwrap();

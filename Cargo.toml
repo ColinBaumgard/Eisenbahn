@@ -12,6 +12,9 @@ bevy-inspector-egui = "0.18.1"
 petgraph = "0.6.3"
 itertools = "0.10.5"
 bevy_egui = "0.20.0"
+rand = "0.8.5"
+bracket-noise = "~0.8"
+optimization = "*"
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]

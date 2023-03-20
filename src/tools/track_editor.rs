@@ -82,7 +82,7 @@ fn exit_system(
         let affected_edges = graph.0.edges(e);
         let mut to_be_removed = vec![e];
         for edge in affected_edges {
-            commands.entity(*edge.2).despawn();
+            to_be_removed.push(*edge.2);
             for node in [edge.0, edge.1] {
                 if node != e
                     && graph.0.edges(node).exactly_one().is_ok()
@@ -93,9 +93,9 @@ fn exit_system(
                 }
             }
         }
-        for node in to_be_removed {
-            graph.0.remove_node(node);
-            commands.entity(node).despawn();
+        for entity in to_be_removed {
+            graph.0.remove_node(entity);
+            commands.entity(entity).despawn();
         }
     }
     commands.insert_resource(TrackEditorMode::Idle);

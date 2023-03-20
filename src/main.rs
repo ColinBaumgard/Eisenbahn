@@ -1,7 +1,9 @@
 #![allow(unused_imports)]
 #![allow(unused)]
 
-use crate::{components::*, eisenbahn::*, gui::*, input::*, num::*, tools::*, tracks::*};
+use crate::{
+    components::*, eisenbahn::*, gui::*, input::*, num::*, terrain::*, tools::*, tracks::*,
+};
 
 use bevy::{prelude::*, window::WindowResolution};
 use bevy_egui::{egui, EguiContext, EguiPlugin};
@@ -19,8 +21,10 @@ mod in_game_components;
 mod input;
 mod layer;
 mod num;
+mod terrain;
 mod tools;
 mod tracks;
+mod train;
 
 fn main() {
     let mut app = App::new();

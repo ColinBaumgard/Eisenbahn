@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bracket_noise::prelude::*;
 use petgraph::graphmap::*;
 
 #[derive(Component)]
@@ -56,6 +57,7 @@ pub struct LeftMouseEvent;
 pub enum Tool {
     Viewer,
     TrackEditor,
+    TrainEditor,
 }
 
 #[derive(Resource, Debug, PartialEq)]
@@ -66,6 +68,8 @@ pub enum TrackEditorMode {
 
 #[derive(Component)]
 pub struct HookedOnCursor;
+#[derive(Component)]
+pub struct HookedOnTrack;
 
 #[derive(Component)]
 pub struct Moved;
@@ -81,3 +85,22 @@ pub struct Selected;
 
 #[derive(Resource, Clone, Copy)]
 pub struct MainWindowSize(pub Vec2);
+
+#[derive(Component)]
+pub struct Train {
+    pub destination: Entity,
+}
+
+#[derive(Component, Clone, Debug)]
+pub struct TrackPosition {
+    pub current_track: Entity,
+    pub lin_pos: f32,
+}
+
+#[derive(Resource)]
+pub struct Terrain {
+    pub scale: f32,
+    pub noise: FastNoise,
+    pub height_scale: f32,
+    pub height_offset: f32,
+}
