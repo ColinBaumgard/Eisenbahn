@@ -10,11 +10,17 @@ use crate::{
 };
 
 use bevy::{
+    core_pipeline::core_2d::*,
     ecs::query::WorldQuery,
     math,
     prelude::*,
-    render::{mesh::*, render_resource::*, *},
-    sprite::{Material2d, MaterialMesh2dBundle},
+    reflect::TypeUuid,
+    render::{
+        mesh::*, render_asset::*, render_phase::*, render_resource::*, texture::BevyDefault,
+        view::*, *,
+    },
+    sprite::*,
+    utils::FloatOrd,
 };
 use bevy_prototype_lyon::{
     entity::*,
@@ -32,7 +38,10 @@ impl Plugin for TerrainPlugin {
 
         app.insert_resource(Terrain::new(400.0));
 
-        app.add_startup_systems((generation_system, mesh_system));
+        app.add_plugin(TerrainMesh2dPlugin);
+
+        app.add_startup_system(mesh_system);
+        // app.add_startup_systems((generation_system, isolines_system));
     }
 }
 
@@ -49,7 +58,7 @@ fn mesh_system(
     let mut indices: Vec<u32> = Vec::new();
     let mut colors: Vec<[f32; 4]> = Vec::new();
 
-    let step = 50.0;
+    let step = 200.0;
     let (n, m) = (
         (window_size.0.x / step) as u32 + 1,
         (window_size.0.y / step) as u32 + 1,
@@ -65,8 +74,9 @@ fn mesh_system(
         for i in (0..n) {
             let mut pos = Vec2::new(i as f32, j as f32) * step - pos_middle;
             vertices.push([pos.x, pos.y, 0.0]);
-            let color: [f32; 3] = rng.gen();
-            colors.push([color[0], color[1], color[2], 1.0]);
+            // let color: [f32; 3] = rng.gen();
+            let z = terrain.z(pos);
+            colors.push([0.2 + z * 0.8, 0.2, 1.0 - z * 0.8, 1.0]);
         }
     }
 
@@ -76,14 +86,9 @@ fn mesh_system(
     for j in (0..m2) {
         for i in (0..n2) {
             let a = n * j + i;
-            // println!("{:?}", a);
-            indices.push(a);
-            indices.push(a + 1);
-            indices.push(a + n);
-
-            indices.push(a + n + 1);
-            indices.push(a + 1);
-            indices.push(a + n);
+            let b = n * (j + 1) + i;
+            indices.extend_from_slice(&[a, a + 1, b]);
+            indices.extend_from_slice(&[a + 1, b + 1, b]);
         }
     }
 
@@ -91,15 +96,302 @@ fn mesh_system(
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.set_indices(Some(Indices::U32(indices)));
 
-    commands.spawn(ColorMesh2dBundle {
-        mesh: meshes.add(mesh).into(),
-        transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.0)),
-        material: materials.add(ColorMaterial::from(Color::YELLOW)),
-        ..default()
-    });
+    commands.spawn((
+        TerrainMesh2d::default(),
+        Mesh2dHandle(meshes.add(mesh)),
+        SpatialBundle::INHERITED_IDENTITY,
+    ));
 
     println!("OK");
 }
+
+impl Terrain {
+    pub fn new(scale: f32) -> Self {
+        let mut rng = rand::thread_rng();
+        let mut noise = FastNoise::seeded(rng.gen());
+        noise.set_noise_type(NoiseType::PerlinFractal);
+        noise.set_fractal_type(FractalType::FBM);
+        noise.set_fractal_octaves(3);
+        noise.set_fractal_gain(0.8);
+        noise.set_fractal_lacunarity(2.0);
+        noise.set_frequency(1.0);
+
+        let mut t = Terrain {
+            scale: scale,
+            noise: noise,
+            height_offset: 0.0,
+            height_scale: 1.0,
+        };
+        t.auto_scale();
+        t
+    }
+
+    pub fn auto_scale(&mut self) {
+        self.height_offset = 0.0;
+        self.height_scale = 1.0;
+        let min = find_min(
+            self,
+            Vec2::new(-self.scale, self.scale),
+            Vec2::new(-self.scale, self.scale),
+        )
+        .unwrap();
+        let max = find_max(
+            self,
+            Vec2::new(-self.scale, self.scale),
+            Vec2::new(-self.scale, self.scale),
+        )
+        .unwrap();
+        let amplitude = self.z(max) - self.z(min);
+        self.height_offset = -self.z(min);
+        self.height_scale = 1.0 / amplitude;
+    }
+
+    pub fn z(&self, pos: Vec2) -> f32 {
+        self.noise.get_noise(pos.x / self.scale, pos.y / self.scale) * self.height_scale
+            + self.height_offset
+    }
+    pub fn grad(&self, pos: Vec2) -> Vec2 {
+        let eps = 5.0;
+        let dx = (self.z(Vec2::new(pos.x + eps, pos.y)) - self.z(Vec2::new(pos.x - eps, pos.y)));
+        let dy = (self.z(Vec2::new(pos.x, pos.y + eps)) - self.z(Vec2::new(pos.x, pos.y - eps)));
+        Vec2::new(dx, dy) / (2.0 * eps)
+    }
+}
+
+#[derive(Component, Default)]
+pub struct TerrainMesh2d;
+
+#[derive(Resource)]
+pub struct TerrainMesh2dPipeline {
+    mesh2d_pipeline: Mesh2dPipeline,
+}
+
+impl FromWorld for TerrainMesh2dPipeline {
+    fn from_world(world: &mut World) -> Self {
+        Self {
+            mesh2d_pipeline: Mesh2dPipeline::from_world(world),
+        }
+    }
+}
+
+impl SpecializedRenderPipeline for TerrainMesh2dPipeline {
+    type Key = Mesh2dPipelineKey;
+
+    fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
+        let formats = vec![VertexFormat::Float32x3, VertexFormat::Float32x4];
+
+        let vertex_layout =
+            VertexBufferLayout::from_vertex_formats(VertexStepMode::Vertex, formats);
+
+        let format = match key.contains(Mesh2dPipelineKey::HDR) {
+            true => ViewTarget::TEXTURE_FORMAT_HDR,
+            false => TextureFormat::bevy_default(),
+        };
+
+        RenderPipelineDescriptor {
+            label: Some("terrain_mesh_pipeline".into()),
+            layout: vec![
+                self.mesh2d_pipeline.view_layout.clone(),
+                self.mesh2d_pipeline.mesh_layout.clone(),
+            ],
+            push_constant_ranges: Vec::new(),
+            vertex: VertexState {
+                shader: COLORED_MESH2D_SHADER_HANDLE.typed::<Shader>(),
+                entry_point: "vertex".into(),
+                shader_defs: Vec::new(),
+                buffers: vec![vertex_layout],
+            },
+            primitive: PrimitiveState {
+                front_face: FrontFace::Ccw,
+                cull_mode: Some(Face::Back),
+                unclipped_depth: false,
+                polygon_mode: PolygonMode::Fill,
+                conservative: false,
+                topology: key.primitive_topology(),
+                strip_index_format: None,
+            },
+            depth_stencil: None,
+            multisample: MultisampleState {
+                count: key.msaa_samples(),
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            fragment: Some(FragmentState {
+                shader: COLORED_MESH2D_SHADER_HANDLE.typed::<Shader>(),
+                shader_defs: Vec::new(),
+                entry_point: "fragment".into(),
+                targets: vec![Some(ColorTargetState {
+                    format,
+                    blend: Some(BlendState::ALPHA_BLENDING),
+                    write_mask: ColorWrites::ALL,
+                })],
+            }),
+        }
+    }
+}
+
+type DrawColoredMesh2d = (
+    // Set the pipeline
+    SetItemPipeline,
+    // Set the view uniform as bind group 0
+    SetMesh2dViewBindGroup<0>,
+    // Set the mesh uniform as bind group 1
+    SetMesh2dBindGroup<1>,
+    // Draw the mesh
+    DrawMesh2d,
+);
+
+const COLORED_MESH2D_SHADER: &str = r"
+// Import the standard 2d mesh uniforms and set their bind groups
+#import bevy_sprite::mesh2d_types
+#import bevy_sprite::mesh2d_view_bindings
+
+@group(1) @binding(0)
+var<uniform> mesh: Mesh2d;
+
+// NOTE: Bindings must come before functions that use them!
+#import bevy_sprite::mesh2d_functions
+
+// The structure of the vertex buffer is as specified in `specialize()`
+struct Vertex {
+    @location(0) position: vec3<f32>,
+    @location(1) color: vec4<f32>,
+};
+
+struct VertexOutput {
+    // The vertex shader must set the on-screen position of the vertex
+    @builtin(position) clip_position: vec4<f32>,
+    // We pass the vertex color to the fragment shader in location 0
+    @location(0) color: vec4<f32>,
+};
+
+/// Entry point for the vertex shader
+@vertex
+fn vertex(vertex: Vertex) -> VertexOutput {
+    var out: VertexOutput;
+    // Project the world position of the mesh into screen position
+    out.clip_position = mesh2d_position_local_to_clip(mesh.model, vec4<f32>(vertex.position, 1.0));
+    // Unpack the `u32` from the vertex buffer into the `vec4<f32>` used by the fragment shader
+    // out.color = vec4<f32>((vec4<u32>(vertex.color) >> vec4<u32>(0u, 8u, 16u, 24u)) & vec4<u32>(255u)) / 255.0;
+    out.color = vertex.color;
+    return out;
+}
+
+// The input of the fragment shader must correspond to the output of the vertex shader for all `location`s
+struct FragmentInput {
+    // The color is interpolated between vertices by default
+    @location(0) color: vec4<f32>,
+};
+
+/// Entry point for the fragment shader
+@fragment
+fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
+    return in.color;
+}
+";
+
+/// Handle to the custom shader with a unique random ID
+pub const COLORED_MESH2D_SHADER_HANDLE: HandleUntyped =
+    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 13828845428412094821);
+
+/// Plugin that renders [`ColoredMesh2d`]s
+pub struct TerrainMesh2dPlugin;
+
+impl Plugin for TerrainMesh2dPlugin {
+    fn build(&self, app: &mut App) {
+        // Load our custom shader
+        let mut shaders = app.world.resource_mut::<Assets<Shader>>();
+        shaders.set_untracked(
+            COLORED_MESH2D_SHADER_HANDLE,
+            Shader::from_wgsl(COLORED_MESH2D_SHADER),
+        );
+
+        // Register our custom draw function and pipeline, and add our render systems
+        app.get_sub_app_mut(RenderApp)
+            .unwrap()
+            .add_render_command::<Transparent2d, DrawColoredMesh2d>()
+            .init_resource::<TerrainMesh2dPipeline>()
+            .init_resource::<SpecializedRenderPipelines<TerrainMesh2dPipeline>>()
+            .add_system(extract_colored_mesh2d.in_schedule(ExtractSchedule))
+            .add_system(queue_colored_mesh2d.in_set(RenderSet::Queue));
+    }
+}
+
+/// Extract the [`ColoredMesh2d`] marker component into the render app
+pub fn extract_colored_mesh2d(
+    mut commands: Commands,
+    mut previous_len: Local<usize>,
+    // When extracting, you must use `Extract` to mark the `SystemParam`s
+    // which should be taken from the main world.
+    query: Extract<Query<(Entity, &ComputedVisibility), With<TerrainMesh2d>>>,
+) {
+    let mut values = Vec::with_capacity(*previous_len);
+    for (entity, computed_visibility) in &query {
+        if !computed_visibility.is_visible() {
+            continue;
+        }
+        values.push((entity, TerrainMesh2d));
+    }
+    *previous_len = values.len();
+    commands.insert_or_spawn_batch(values);
+}
+
+/// Queue the 2d meshes marked with [`ColoredMesh2d`] using our custom pipeline and draw function
+#[allow(clippy::too_many_arguments)]
+pub fn queue_colored_mesh2d(
+    transparent_draw_functions: Res<DrawFunctions<Transparent2d>>,
+    colored_mesh2d_pipeline: Res<TerrainMesh2dPipeline>,
+    mut pipelines: ResMut<SpecializedRenderPipelines<TerrainMesh2dPipeline>>,
+    pipeline_cache: Res<PipelineCache>,
+    msaa: Res<Msaa>,
+    render_meshes: Res<RenderAssets<Mesh>>,
+    colored_mesh2d: Query<(&Mesh2dHandle, &Mesh2dUniform), With<TerrainMesh2d>>,
+    mut views: Query<(
+        &VisibleEntities,
+        &mut RenderPhase<Transparent2d>,
+        &ExtractedView,
+    )>,
+) {
+    if colored_mesh2d.is_empty() {
+        return;
+    }
+    // Iterate each view (a camera is a view)
+    for (visible_entities, mut transparent_phase, view) in &mut views {
+        let draw_colored_mesh2d = transparent_draw_functions.read().id::<DrawColoredMesh2d>();
+
+        let mesh_key = Mesh2dPipelineKey::from_msaa_samples(msaa.samples())
+            | Mesh2dPipelineKey::from_hdr(view.hdr);
+
+        // Queue all entities visible to that view
+        for visible_entity in &visible_entities.entities {
+            if let Ok((mesh2d_handle, mesh2d_uniform)) = colored_mesh2d.get(*visible_entity) {
+                // Get our specialized pipeline
+                let mut mesh2d_key = mesh_key;
+                if let Some(mesh) = render_meshes.get(&mesh2d_handle.0) {
+                    mesh2d_key |=
+                        Mesh2dPipelineKey::from_primitive_topology(mesh.primitive_topology);
+                }
+
+                let pipeline_id =
+                    pipelines.specialize(&pipeline_cache, &colored_mesh2d_pipeline, mesh2d_key);
+
+                let mesh_z = mesh2d_uniform.transform.w_axis.z;
+                transparent_phase.add(Transparent2d {
+                    entity: *visible_entity,
+                    draw_function: draw_colored_mesh2d,
+                    pipeline: pipeline_id,
+                    // The 2d render items are sorted according to their z value before rendering,
+                    // in order to get correct transparency
+                    sort_key: FloatOrd(mesh_z),
+                    // This material is not batched
+                    batch_range: None,
+                });
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
 
 fn grid_generation_system(mut commands: Commands, window_size: Res<MainWindowSize>) {
     let grid_size = 50.0;
@@ -418,57 +710,4 @@ fn iso_step(terrain: &Terrain, pos: Vec2, target_z: f32, step_size: f32) -> Vec2
         return p;
     }
     return next_pos;
-}
-
-impl Terrain {
-    pub fn new(scale: f32) -> Self {
-        let mut rng = rand::thread_rng();
-        let mut noise = FastNoise::seeded(rng.gen());
-        noise.set_noise_type(NoiseType::PerlinFractal);
-        noise.set_fractal_type(FractalType::FBM);
-        noise.set_fractal_octaves(3);
-        noise.set_fractal_gain(0.8);
-        noise.set_fractal_lacunarity(2.0);
-        noise.set_frequency(1.0);
-
-        let mut t = Terrain {
-            scale: scale,
-            noise: noise,
-            height_offset: 0.0,
-            height_scale: 1.0,
-        };
-        t.auto_scale();
-        t
-    }
-
-    pub fn auto_scale(&mut self) {
-        self.height_offset = 0.0;
-        self.height_scale = 1.0;
-        let min = find_min(
-            self,
-            Vec2::new(-self.scale, self.scale),
-            Vec2::new(-self.scale, self.scale),
-        )
-        .unwrap();
-        let max = find_max(
-            self,
-            Vec2::new(-self.scale, self.scale),
-            Vec2::new(-self.scale, self.scale),
-        )
-        .unwrap();
-        let amplitude = self.z(max) - self.z(min);
-        self.height_offset = -self.z(min);
-        self.height_scale = 1.0 / amplitude;
-    }
-
-    pub fn z(&self, pos: Vec2) -> f32 {
-        self.noise.get_noise(pos.x / self.scale, pos.y / self.scale) * self.height_scale
-            + self.height_offset
-    }
-    pub fn grad(&self, pos: Vec2) -> Vec2 {
-        let eps = 5.0;
-        let dx = (self.z(Vec2::new(pos.x + eps, pos.y)) - self.z(Vec2::new(pos.x - eps, pos.y)));
-        let dy = (self.z(Vec2::new(pos.x, pos.y + eps)) - self.z(Vec2::new(pos.x, pos.y - eps)));
-        Vec2::new(dx, dy) / (2.0 * eps)
-    }
 }
